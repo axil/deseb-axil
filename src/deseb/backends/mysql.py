@@ -6,8 +6,8 @@ class DatabaseOperations:
     
     def quote_value(self, s):
         if type(s) is bool:
-            if s: return "'f'"
-            else: return "'t'"
+            if s: return "'t'"
+            else: return "'f'"
         if type(s) is int:
             return str(s)
         else:
