@@ -37,6 +37,7 @@ class DatabaseOperations:
         fqn = lambda s: self.style.SQL_FIELD(qn(s))
         fqv = lambda s: self.style.SQL_FIELD(self.quote_value(s))
         model = self.get_model_from_table_name(table_name)
+        if not model: return []
         output = []
         output.append('-- FYI: so we create a new ' + qn(table_name) +' and delete the old ')
         output.append('-- FYI: this could take a while if you have a lot of data') 
@@ -46,7 +47,8 @@ class DatabaseOperations:
         output.extend(model_create(model, self.get_all_models_in_app_from_table_name(table_name), self.style)[0])
     
         old_cols = []
-        for f in model._meta.fields:
+        opts = model._meta
+        for f in getattr(opts, 'local_fields', getattr(opts, 'fields', None)):
             if f.column in old_columns:
                 old_cols.append(fqn(f.column))
             elif f.column in renamed_columns:
@@ -86,6 +88,7 @@ class DatabaseOperations:
             return ['-- model not found']
         output = []
         output.append('-- FYI: sqlite does not support changing columns')
+        output.append('-- FYI: have to change "%s"' % col_name)
         return output
     
     def get_add_column_sql(self, table_name, col_name, col_type, null, unique, primary_key, default):
