@@ -60,7 +60,7 @@ class DatabaseOperations:
         output = []
 
         if updates['update_null'] or updates['update_type']:
-            if str(f_default)==str(NOT_PROVIDED) and not f.null: 
+            if str(f_default)==str(NOT_PROVIDED) and not f.null:
                 details = 'column "%s" of table "%s"' % (col_name, table_name)
                 raise NotNullColumnNeedsDefaultException("when modified " + details)
             if str(f_default)!=str(NOT_PROVIDED) and not f.null: 

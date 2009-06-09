@@ -1,3 +1,4 @@
+import traceback
 from django.core.exceptions import ImproperlyConfigured
 from optparse import OptionParser
 from django.utils import termcolors
@@ -101,7 +102,8 @@ def get_sql_evolution_check_for_new_fields(model, old_table_name, style):
         if f.column not in existing_fields and (not f.aka or f.aka not in existing_fields and len(set(f.aka) & set(existing_fields))==0):
             col_type = f.db_type()
             if col_type is not None:
-                output.extend( ops.get_add_column_sql( model._meta.db_table, f.column, style.SQL_COLTYPE(col_type), f.null, f.unique, f.primary_key, f.default ) )
+                f_default = get_field_default(f)
+                output.extend( ops.get_add_column_sql( model._meta.db_table, f.column, style.SQL_COLTYPE(col_type), f.null, f.unique, f.primary_key, f_default ) )
                 if settings.DATABASE_ENGINE == 'sqlite3':
                     if f.unique or f.primary_key or not f.null:
                         continue
@@ -196,7 +198,10 @@ def get_sql_evolution_rebuild_table(klass, old_table_name, style):
     
 def get_field_default(f):
     from django.db.models.fields import NOT_PROVIDED
-    if callable(f.default): return NOT_PROVIDED
+    print f.default, f.blank
+    if callable(f.default):
+      if f.blank: return ''
+      else: return NOT_PROVIDED
     return f.default
 
 def get_field_type(f):
@@ -262,6 +267,7 @@ def get_sql_evolution_check_for_changed_field_flags(klass, old_table_name, style
             if update_type or update_null or update_length or update_unique or update_primary or update_sequences:
                 #print "cf, f.default, column_flags['default']", cf, f.default, column_flags['default'], f.default.__class__
                 f_default = get_field_default(f)
+                print 'woot'
                 updates = {
                     'update_type': update_type,
                     'update_length': update_length,
@@ -630,21 +636,22 @@ def save_managed_evolution( app, commands, schema_fingerprint, new_schema_finger
     file.writelines(contents)
     
 def evolvedb(app, interactive=True, do_save=False, do_notify=True, managed_upgrade_only=False):
-    from django.db import connection
-    cursor = connection.cursor()
+  from django.db import connection
+  cursor = connection.cursor()
 
-    style = color.no_style()
-    ops, introspection = get_operations_and_introspection_classes(style)
-    app_name = app.__name__.split('.')[-2]
+  style = color.no_style()
+  ops, introspection = get_operations_and_introspection_classes(style)
+  app_name = app.__name__.split('.')[-2]
     
-    last_schema_fingerprint = None
-    seen_schema_fingerprints = set()
+  last_schema_fingerprint = None
+  seen_schema_fingerprints = set()
     
-    fingerprints, evolutions = get_fingerprints_evolutions_from_app(app, style, do_notify)
-    if fingerprints and evolutions:
-        if do_notify:
-            print 'deseb: %s.schema_evolution module found (%i fingerprints, %i evolutions)' % (app_name, len(fingerprints), len(evolutions))
+  fingerprints, evolutions = get_fingerprints_evolutions_from_app(app, style, do_notify)
+  if fingerprints and evolutions:
+    if do_notify:
+      print 'deseb: %s.schema_evolution module found (%i fingerprints, %i evolutions)' % (app_name, len(fingerprints), len(evolutions))
 
+  try:
     while True:
         commands = []
         commands_color = []
@@ -721,4 +728,9 @@ def evolvedb(app, interactive=True, do_save=False, do_notify=True, managed_upgra
     
         if schema_fingerprint in seen_schema_fingerprints:
             break
-
+            
+  except NotNullColumnNeedsDefaultException as e:
+    print 'Exception - Not null columns need to have a default value:'
+    print '\t', e
+#    traceback.print_exc()
+    
