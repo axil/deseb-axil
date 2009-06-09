@@ -72,8 +72,8 @@ class DatabaseOperations:
         col_def = fct(col_type)
         if not f.primary_key:
             col_def += ' ' + kw(not f.null and 'NOT NULL' or 'NULL')
-        #if f.unique:
-        #    col_def += ' ' + kw('UNIQUE')
+        if f.unique:
+            col_def += ' ' + kw('UNIQUE')
         #if f.primary_key:
         #    col_def += ' ' + kw('PRIMARY KEY')
         output.append(

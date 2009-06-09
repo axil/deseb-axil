@@ -267,7 +267,6 @@ def get_sql_evolution_check_for_changed_field_flags(klass, old_table_name, style
             if update_type or update_null or update_length or update_unique or update_primary or update_sequences:
                 #print "cf, f.default, column_flags['default']", cf, f.default, column_flags['default'], f.default.__class__
                 f_default = get_field_default(f)
-                print 'woot'
                 updates = {
                     'update_type': update_type,
                     'update_length': update_length,
