@@ -12,7 +12,7 @@ except ImportError:
 added_aka_support = False
 
 def db_type(self):
-    from django.db import get_creation_module
+    from django.db import get_creation_module #@UnresolvedImport
     from django.db.models.fields.related import ForeignKey
     data_types = get_creation_module().DATA_TYPES
     internal_type = self.get_internal_type()

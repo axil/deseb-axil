@@ -1,9 +1,12 @@
 from deseb.schema_evolution import NotNullColumnNeedsDefaultException
+from base import DesebDatabaseOperations
 
 try: set 
 except NameError: from sets import Set as set   # Python 2.3 fallback 
 
-class DatabaseOperations:
+class DatabaseOperations(DesebDatabaseOperations):
+    pk_requires_unique = False
+
     def quote_value(self, s):
         if type(s) is bool:
             if s: return "'t'"
@@ -13,12 +16,6 @@ class DatabaseOperations:
         else:
             return u"'%s'" % unicode(s).replace("'","\'")
     
-    def __init__(self, connection, style):
-        self.connection = connection
-        self.style = style
-    
-    pk_requires_unique = False
-
     def get_change_table_name_sql( self, table_name, old_table_name ):
         output = []
         qn = self.connection.ops.quote_name
@@ -45,6 +42,7 @@ class DatabaseOperations:
         return output
 
     def get_change_column_def_sql( self, table_name, col_name, col_type, f, column_flags, f_default, updates ):
+        #print 'get_change_column_def_sql', table_name, col_name, col_type, f, column_flags, f_default, updates
         from django.db.models.fields import NOT_PROVIDED
         output = []
         qn = self.connection.ops.quote_name
@@ -113,6 +111,11 @@ class DatabaseOperations:
                 table_name + '_' + col_name + '_unique_constraint'+
                 kw(' UNIQUE(') + fqn(col_name) + kw(')')+';' )
             
+        if updates['update_index']:
+            if f.db_index:
+                output.extend(self.get_sql_indexes_for_field(None, table_name, f))
+            if not f.db_index:
+                output.extend(self.drop_sql_index_for_field(column_flags['db_index']))
         return output
     
     def get_add_column_sql( self, table_name, col_name, col_type, null, unique, primary_key, f_default):
@@ -263,12 +266,15 @@ class DatabaseIntrospection:
             'foreign_key': False,
             'unique': False,
             'allow_null': False,
+            'db_index': None,
             'max_length': None
         }
     
+        attnum = None
         for row in cursor.fetchall():
             if row[0] == column_name:
-        # maxlength check goes here
+                attnum = row[4]
+                # maxlength check goes here
                 dict['allow_null'] = not row[3]
                 dict['coltype'] = row[1]
                 if row[1][0:17]=='character varying':
@@ -284,16 +290,29 @@ class DatabaseIntrospection:
         shared_unique_connames = set()
         cursor.execute("select pg_constraint.conname, pg_constraint.contype, pg_attribute.attname from pg_constraint, pg_attribute, pg_class where pg_constraint.conrelid=pg_class.oid and pg_constraint.conrelid=pg_attribute.attrelid and pg_attribute.attnum=any(pg_constraint.conkey) and pg_class.relname='%s'" % table_name )
         for row in cursor.fetchall():
-    #        print row
             if row[2] == column_name:
-                if row[1]=='p': dict['primary_key'] = True
-                if row[1]=='f': dict['foreign_key'] = True
-                if row[1]=='u': unique_conname = row[0]
+                if row[1]=='p': 
+                    dict['primary_key'] = True
+                elif row[1]=='f': 
+                    dict['foreign_key'] = True
+                elif row[1]=='u':
+                    unique_conname = row[0]
             else:
                 if row[1]=='u': shared_unique_connames.add( row[0] )
+        
         if unique_conname and unique_conname not in shared_unique_connames:
             dict['unique'] = True
             
+        #get indexes
+        cursor.execute("""SELECT c2.relname, i.indisprimary, i.indisunique, i.indisclustered,
+        i.indisvalid, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true), c2.reltablespace
+        FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+        WHERE c.relname = '%s' AND i.indkey = '%s' and c.oid = i.indrelid AND i.indexrelid = c2.oid 
+        ORDER BY i.indisprimary DESC, i.indisunique DESC, c2.relname;""" % (table_name, attnum) )
+        for row in cursor.fetchall():
+            #print 'Index found on', table_name, column_name, row[0]
+            if not row[1] and not row[2]: # primary or unique
+                dict['db_index'] = row[0]
                 # default value check goes here
         #cursor.execute("SELECT character_maximum_length, is_nullable, column_default FROM information_schema.columns WHERE table_name = %s AND column_name = %s" , [table_name,column_name])
         #print 'cursor.fetchall()', cursor.fetchall()

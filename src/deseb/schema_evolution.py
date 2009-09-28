@@ -198,7 +198,6 @@ def get_sql_evolution_rebuild_table(klass, old_table_name, style):
     
 def get_field_default(f):
     from django.db.models.fields import NOT_PROVIDED
-    print f.default, f.blank
     if callable(f.default):
       if f.blank: return ''
       else: return NOT_PROVIDED
@@ -247,7 +246,8 @@ def get_sql_evolution_check_for_changed_field_flags(klass, old_table_name, style
         else:
             continue # no idea what column you're talking about - should be handled by get_sql_evolution_check_for_new_fields())
         data_type = f.get_internal_type()
-        if data_types.has_key(data_type):
+        #if data_types.has_key(data_type):
+        if not f.db_type() is None:
             #print cf, data_type, f_col_type
             is_postgresql = settings.DATABASE_ENGINE in ['postgresql', 'postgresql_psycopg2']
             column_flags = introspection.get_known_column_flags(cursor, db_table, cf)
@@ -258,13 +258,15 @@ def get_sql_evolution_check_for_changed_field_flags(klass, old_table_name, style
             update_unique = ( column_flags['unique']!=f.unique and not (f.primary_key) )
             update_null = column_flags['allow_null'] != f.null and not f.primary_key
             update_primary = column_flags['primary_key']!=f.primary_key
+            has_index = column_flags.get('db_index') != None 
+            update_index = 'db_index' in column_flags and has_index != f.db_index and not f.unique
             update_sequences = False
             if column_flags.has_key('sequence'):
                 correct_seq_name = klass._meta.db_table+"_"+cf+'_seq'
                 update_sequences = column_flags['sequence'] != correct_seq_name
             #if DEBUG and update_length: 
             #    print f_col_type, column_flags['coltype'], column_flags['maxlength']
-            if update_type or update_null or update_length or update_unique or update_primary or update_sequences:
+            if update_type or update_null or update_length or update_unique or update_index or update_primary or update_sequences:
                 #print "cf, f.default, column_flags['default']", cf, f.default, column_flags['default'], f.default.__class__
                 f_default = get_field_default(f)
                 updates = {
@@ -272,6 +274,7 @@ def get_sql_evolution_check_for_changed_field_flags(klass, old_table_name, style
                     'update_length': update_length,
                     'update_unique': update_unique,
                     'update_null': update_null,
+                    'update_index': update_index,
                     'update_primary': update_primary,
                     'update_sequences': update_sequences,
                 }
@@ -728,8 +731,8 @@ def evolvedb(app, interactive=True, do_save=False, do_notify=True, managed_upgra
         if schema_fingerprint in seen_schema_fingerprints:
             break
             
-  except NotNullColumnNeedsDefaultException as e:
+  except NotNullColumnNeedsDefaultException:
     print 'Exception - Not null columns need to have a default value:'
-    print '\t', e
+    print '\t', sys.exc_info()[1], ':', sys.exc_info()[0]
 #    traceback.print_exc()
     

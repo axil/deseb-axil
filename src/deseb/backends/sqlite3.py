@@ -39,7 +39,7 @@ class DatabaseOperations:
         model = self.get_model_from_table_name(table_name)
         if not model: return []
         output = []
-        output.append('-- FYI: so we create a new ' + qn(table_name) +' and delete the old ')
+        output.append('-- FYI: we create a new ' + qn(table_name) +' and delete the old ')
         output.append('-- FYI: this could take a while if you have a lot of data') 
     
         tmp_table_name = table_name + '_1337_TMP' # unlikely to produce a namespace conflict
@@ -74,7 +74,7 @@ class DatabaseOperations:
         if not model: 
             return ['-- model not found']
         output = []
-        output.append('-- FYI: sqlite does not support renaming columns')
+        output.append('-- FYI: renaming "%s" to "%s"' % (old_col_name, new_col_name))
         return output
 
     def get_change_column_def_sql(self, table_name, col_name, col_type, f, column_flags, f_default, updates):
@@ -87,8 +87,7 @@ class DatabaseOperations:
         if not model: 
             return ['-- model not found']
         output = []
-        output.append('-- FYI: sqlite does not support changing columns')
-        output.append('-- FYI: have to change "%s"' % col_name)
+        output.append('-- FYI: changing traits for column "%s"' % col_name)
         return output
     
     def get_add_column_sql(self, table_name, col_name, col_type, null, unique, primary_key, default):
@@ -100,7 +99,7 @@ class DatabaseOperations:
         tqn = lambda s: self.style.SQL_TABLE(qn(s))
         fqn = lambda s: self.style.SQL_FIELD(qn(s))
         if unique or primary_key or not null:
-            output.append('-- FYI: sqlite does not support adding primary keys or unique or not null fields')
+            output.append('-- FYI: adding column "%s"' % col_name)
         else:
             output.append(' '.join(
             [ kw('ALTER TABLE'), tqn(table_name), 
@@ -109,7 +108,7 @@ class DatabaseOperations:
     
     def get_drop_column_sql(self, table_name, col_name):
         output = []
-        output.append('-- FYI: sqlite does not support deleting columns')
+        output.append('-- FYI: deleting column "%s"' % col_name)
         return output
     
     def get_drop_table_sql( self, delete_tables):
