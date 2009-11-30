@@ -63,7 +63,8 @@ def get_sql_indexes_for_field(model, f, style):
     "Returns the CREATE INDEX SQL statement for a single field"
     from django.db import backend, connection
     output = []
-    if f.db_index and not ((f.primary_key or f.unique) and connection.features.autoindexes_primary_keys):
+    autoindexes_pk = getattr(connection.features, 'autoindexes_primary_keys', False)
+    if f.db_index and not ((f.primary_key or f.unique) and autoindexes_pk):
         unique = f.unique and 'UNIQUE ' or ''
         try:
             tablespace = f.db_tablespace or model._meta.db_tablespace
@@ -390,7 +391,8 @@ def _get_many_to_many_sql_for_field(model, f, style):
             tablespace = f.db_tablespace or opts.db_tablespace
         except: # v0.96 compatibility
             tablespace = None
-        if tablespace and backend.supports_tablespaces and connection.features.autoindexes_primary_keys:
+        autoindexes_pk = getattr(connection.features, 'autoindexes_primary_keys', False)
+        if tablespace and backend.supports_tablespaces and autoindexes_pk:
             tablespace_sql = ' ' + backend.get_tablespace_sql(tablespace, inline=True)
         else:
             tablespace_sql = ''
