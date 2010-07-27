@@ -300,8 +300,9 @@ def get_sql_evolution_check_for_dead_fields(klass, old_table_name, style):
 #        print 'f = ', f
 #        print 'f.aka = ', f.aka
         suspect_fields.discard(f.column)
-        suspect_fields.discard(f.aka)
-        if f.aka: suspect_fields.difference_update(f.aka)
+        if hasattr(f, 'aka'):
+            suspect_fields.discard(f.aka)
+            if f.aka: suspect_fields.difference_update(f.aka)
     if len(suspect_fields)>0:
         output.append( '-- warning: the following may cause data loss' )
         for suspect_field in suspect_fields:
@@ -544,7 +545,7 @@ def get_introspected_evolution_options(app, style):
     for model in model_list:
         # Create the model's database table, if it doesn't already exist.
         aka_db_tables = set()
-        if model._meta.aka:
+        if getattr(model._meta, 'aka', ''):
             for x in model._meta.aka:
                 aka_db_tables.add( "%s_%s" % (model._meta.app_label, x.lower()) )
         if model._meta.db_table in table_list or len(aka_db_tables & set(table_list))>0:
